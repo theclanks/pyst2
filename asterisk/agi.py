@@ -203,7 +203,13 @@ class AGI:
         digit.  Returns digit dialed
         Throws AGIError on channel falure
         """
-        res = self.execute('WAIT FOR DIGIT', timeout)['result'][0]
+        try:
+            res = self.execute('WAIT FOR DIGIT', timeout)['result'][0]
+        except AGIHangup:
+            raise
+        except AGIAppError:
+            result = {'result': ('-1', '')}
+            
         if res == '0':
             return ''
         else:
