@@ -16,6 +16,11 @@ pyst2: A Python Interface to Asterisk
 .. image:: https://github.com/rdegges/pyst2/raw/master/assets/snake-sketch.jpg
    :alt: Snake Sketch
 
+Project Documentation
+---------------------
+
+http://pyst2.readthedocs.io
+
 
 Meta
 ----
@@ -89,6 +94,17 @@ directly on the host where Asterisk is running. Since Asterisk doesn't
 run on windows platforms (and probably never will) the agi part of the
 package can only be run on Asterisk platforms.
 
+FastAGI
+-------
+
+FastAGI support is a python based raw SocketServer, To start the server
+python fastagi.py should start it listening on localhost and the default
+asterisk FastAGI port. This does require the newest version of pyst2.
+The FastAGI server runs in as a Forked operation for each request, in
+an attempt to prevent blocking by a single bad service. As a result the
+FastAGI server may consume more memory then a single process. If you need
+to use a single process simply uncomment the appropriate line. Future versions
+of this will use a config file to set options.
 
 Credits
 -------

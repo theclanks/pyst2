@@ -2,9 +2,15 @@
 # vim: set expandtab shiftwidth=4:
 
 """
-Python Interface for Asterisk Manager
+.. module:: manager
+   :synopsis: Python Interface for Asterisk Manager
 
 This module provides a Python API for interfacing with the asterisk manager.
+
+Example
+-------
+
+.. code-block:: python
 
    import asterisk.manager
    import sys
@@ -50,6 +56,9 @@ Remember all header, response, and event names are case sensitive.
 
 Not all manager actions are implmented as of yet, feel free to add them
 and submit patches.
+
+Specification
+-------------
 """
 
 import sys
@@ -108,7 +117,15 @@ class ManagerMsg(object):
                 break
             try:
                 k, v = (x.strip() for x in line.split(':', 1))
-                self.headers[k] = v
+                # if header is ChanVariable it can have more that one value
+                # we store the variable in a dictionary parsed
+                if 'ChanVariable' in k:
+                    if not self.headers.has_key('ChanVariable'):
+                        self.headers['ChanVariable']={}
+                    name, value = (x.strip() for x in v.split('=',1))
+                    self.headers['ChanVariable'][name]=value
+                else:
+                    self.headers[k] = v
             except ValueError:
                 # invalid header, start of multi-line data response
                 data.extend(response[n:])
@@ -263,7 +280,7 @@ class Manager(object):
 
         # lock the socket and send our command
         try:
-            self._sock.write(command.encode('ascii'))
+            self._sock.write(command.encode('utf8','ignore'))
             self._sock.flush()
         except socket.error as e:
             raise ManagerSocketException(e.errno, e.strerror)
@@ -291,7 +308,7 @@ class Manager(object):
             try:
                 lines = []
                 for line in self._sock:
-                    line = line.decode('ascii')
+                    line = line.decode('utf8','ignore')
                     # check to see if this is the greeting line
                     if not self.title and '/' in line and not ':' in line:
                         # store the title of the manager we are connecting to:
@@ -331,7 +348,7 @@ class Manager(object):
                             line.split(':', 1)[1].strip() == 'Follows':
                         wait_for_marker = True
                     # same when seeing end of multiline response
-                    if multiline and line.startswith('--END COMMAND--'):
+                    if multiline and (line.startswith('--END COMMAND--') or line.strip().endswith('--END COMMAND--')):
                         wait_for_marker = False
                         multiline = False
                     # same when seeing end of status response
@@ -558,7 +575,7 @@ class Manager(object):
 
         return response
 
-    def originate(self, channel, exten, context='', priority='', timeout='', caller_id='', async=False, account='', variables={}):
+    def originate(self, channel, exten, context='', priority='', timeout='', caller_id='', async=False, earlymedia='false', account='', variables={}):
         """Originate a call"""
 
         cdict = {'Action': 'Originate'}
@@ -574,6 +591,8 @@ class Manager(object):
             cdict['CallerID'] = caller_id
         if async:
             cdict['Async'] = 'yes'
+        if earlymedia:
+            cdict['EarlyMedia'] = earlymedia
         if account:
             cdict['Account'] = account
         # join dict of vairables together in a string in the form of 'key=val|key=val'
@@ -648,6 +667,16 @@ class Manager(object):
     def sipshowpeer(self, peer):
         cdict = {'Action': 'SIPshowpeer'}
         cdict['Peer'] = peer
+        response = self.send_action(cdict)
+        return response
+
+    def sipshowregistry(self):
+        cdict = {'Action': 'SIPShowregistry'}
+        response = self.send_action(cdict)
+        return response
+
+    def iaxregistry(self):
+        cdict = {'Action': 'IAXregistry'}
         response = self.send_action(cdict)
         return response
 

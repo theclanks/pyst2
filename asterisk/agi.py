@@ -1,28 +1,33 @@
-#!/usr/bin/env python2
-# vim: set et sw=4:
-"""agi
-
-This module contains functions and classes to implment AGI scripts in python.
+#! /usr/bin/env python
+# -*- coding: utf-8 -*-
+# vim: set et sw=4 fenc=utf-8: 
+"""
+.. module:: agi
+   :synopsis: This module contains functions and classes to implment AGI scripts in python. 
+   
 pyvr
 
 {'agi_callerid' : 'mars.putland.int',
  'agi_channel'  : 'IAX[kputland@kputland]/119',
  'agi_context'  : 'default',
- 'agi_dnid'     : '666',
+ 'agi_dnid'     : '1000',
  'agi_enhanced' : '0.0',
- 'agi_extension': '666',
+ 'agi_extension': '1000',
  'agi_language' : 'en',
  'agi_priority' : '1',
  'agi_rdnis'    : '',
  'agi_request'  : 'pyst',
  'agi_type'     : 'IAX'}
 
+Specification
+-------------
 """
 
 import sys
 import pprint
 import re
 import signal
+from six import PY3
 
 DEFAULT_TIMEOUT = 2000  # 2sec timeout used as default for functions that take timeouts
 DEFAULT_RECORD = 20000  # 20sec record time
@@ -77,7 +82,7 @@ class AGIUsageError(AGIError):
 class AGIInvalidCommand(AGIError):
     pass
 
-
+        
 class AGI:
     """
     This class encapsulates communication between Asterisk an a python script.
@@ -85,21 +90,26 @@ class AGI:
     Asterisk.
     """
 
-    def __init__(self):
+    def __init__(self, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr):
+        self.stdin = stdin
+        self.stdout = stdout
+        self.stderr = stderr
         self._got_sighup = False
         signal.signal(signal.SIGHUP, self._handle_sighup)  # handle SIGHUP
-        sys.stderr.write('ARGS: ')
-        sys.stderr.write(str(sys.argv))
-        sys.stderr.write('\n')
+        self.stderr.write('ARGS: ')
+        self.stderr.write(str(sys.argv))
+        self.stderr.write('\n')
         self.env = {}
         self._get_agi_env()
 
     def _get_agi_env(self):
         while 1:
-            line = sys.stdin.readline().strip()
-            sys.stderr.write('ENV LINE: ')
-            sys.stderr.write(line)
-            sys.stderr.write('\n')
+            line = self.stdin.readline().strip()
+            if PY3:
+                if type(line) is bytes: line = line.decode('utf8')
+            self.stderr.write('ENV LINE: ')
+            self.stderr.write(line)
+            self.stderr.write('\n')
             if line == '':
                 #blank line signals end
                 break
@@ -108,12 +118,20 @@ class AGI:
             data = data.strip()
             if key != '':
                 self.env[key] = data
-        sys.stderr.write('class AGI: self.env = ')
-        sys.stderr.write(pprint.pformat(self.env))
-        sys.stderr.write('\n')
+        self.stderr.write('class AGI: self.env = ')
+        self.stderr.write(pprint.pformat(self.env))
+        self.stderr.write('\n')
 
     def _quote(self, string):
-        return ''.join(['"', str(string), '"'])
+        """ provides double quotes to string, converts int/bool to string """
+        if isinstance(string, int):
+          string = str(string)
+        if isinstance(string, float):
+          string = str(string)
+        if PY3:
+            return ''.join(['"', string, '"'])
+        else:
+            return ''.join(['"', string.encode('utf8', 'ignore'), '"'])
 
     def _handle_sighup(self, signum, frame):
         """Handle the SIGHUP signal"""
@@ -144,16 +162,21 @@ class AGI:
         command = command.strip()
         if command[-1] != '\n':
             command += '\n'
-        sys.stderr.write('    COMMAND: %s' % command)
-        sys.stdout.write(command)
-        sys.stdout.flush()
+        self.stderr.write('    COMMAND: %s' % command)
+        if PY3:
+            self.stdout.write(command.encode('utf8'))
+        else:
+            self.stdout.write(command)
+        self.stdout.flush()
 
     def get_result(self, stdin=sys.stdin):
         """Read the result of a command from Asterisk"""
         code = 0
         result = {'result': ('', '')}
-        line = stdin.readline().strip()
-        sys.stderr.write('    RESULT_LINE: %s\n' % line)
+        line = self.stdin.readline().strip()
+        if PY3:
+            if type(line) is bytes: line = line.decode('utf8')
+        self.stderr.write('    RESULT_LINE: %s\n' % line)
         m = re_code.search(line)
         if m:
             code, response = m.groups()
@@ -170,16 +193,20 @@ class AGI:
                 if key == 'result' and value == '-1':
                     raise AGIAppError("Error executing application, or hangup")
 
-            sys.stderr.write('    RESULT_DICT: %s\n' % pprint.pformat(result))
+            self.stderr.write('    RESULT_DICT: %s\n' % pprint.pformat(result))
             return result
         elif code == 510:
             raise AGIInvalidCommand(response)
         elif code == 520:
             usage = [line]
-            line = stdin.readline().strip()
+            line = self.stdin.readline().strip()
+            if PY3:
+                if type(line) is bytes: line = line.decode('utf8')
             while line[:3] != '520':
                 usage.append(line)
-                line = stdin.readline().strip()
+                line = self.stdin.readline().strip()
+                if PY3:
+                    if type(line) is bytes: line = line.decode('utf8')
             usage.append(line)
             usage = '%s\n' % '\n'.join(usage)
             raise AGIUsageError(usage)
@@ -482,17 +509,20 @@ class AGI:
         self.set_extension(extension)
         self.set_priority(priority)
 
-    def record_file(self, filename, format='gsm', escape_digits='#', timeout=DEFAULT_RECORD, offset=0, beep='beep'):
-        """agi.record_file(filename, format, escape_digits, timeout=DEFAULT_TIMEOUT, offset=0, beep='beep') --> None
-        Record to a file until a given dtmf digit in the sequence is received
-        The format will specify what kind of file will be recorded.  The timeout
-        is the maximum record time in milliseconds, or -1 for no timeout. Offset
-        samples is optional, and if provided will seek to the offset without
-        exceeding the end of the file
+    def record_file(self, filename, format='gsm', escape_digits='#', timeout=DEFAULT_RECORD, offset=0, beep='beep', silence=0):
+        """agi.record_file(filename, format, escape_digits, timeout=DEFAULT_TIMEOUT, offset=0, beep='beep', silence=0) --> None
+        Record to a file until a given dtmf digit in the sequence is received. Returns
+        '-1' on hangup or error.  The format will specify what kind of file will be
+        recorded. The <timeout> is the maximum record time in milliseconds, or '-1'
+        for no <timeout>. <offset samples> is optional, and, if provided, will seek
+        to the offset without exceeding the end of the file. <silence> is the number
+        of seconds of silence allowed before the function returns despite the lack
+        of dtmf digits or reaching <timeout>. <silence> value must be preceded by
+        's=' and is also optional.
         """
         escape_digits = self._process_digit_list(escape_digits)
         res = self.execute('RECORD FILE', self._quote(filename), format,
-                           escape_digits, timeout, offset, beep)['result'][0]
+                           escape_digits, timeout, offset, beep, ('s=%s' % silence))['result'][0]
         try:
             return chr(int(res))
         except:
@@ -658,6 +688,13 @@ class AGI:
         Does nothing
         """
         self.execute('NOOP')
+
+    def exec_command(self, command, *args):
+        """Send an arbitrary asterisk command with args (even not AGI commands)"""
+        # The arguments of the command should be prepared as comma delimited, that's the way the EXEC works
+        args = ','.join(map(str, args))
+        return self.execute('EXEC', command, args)
+
 
 if __name__ == '__main__':
     agi = AGI()

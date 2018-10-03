@@ -1,3 +1,28 @@
+2016-11-04  VoiPCS <https://github.com/VoIPCS>
+
+    * Fixing unicode bug in `send_action` for AMI.
+
+2016-02-16  Randall Degges <https://github.com/rdegges>
+
+    * Fixing issue in AGI class init function. Thanks to @sancho2934489 for the
+      find!
+
+2015-11-16  Scinawa Antani <https://github.com/Scinawa>
+
+    * Fixing indentation errors.
+
+2015-11-14  Ben Davis <https://github.com/tuxpowered>
+
+    * Handling more UTF-8 encoding issues in `_quote` method.
+
+2015-07-18  Artem Sorokin
+
+    * Fixing UTF-8 encoding issues.
+
+2015-07-15  Artem Sorokin
+
+    * Fix multiline command end marker for OpenVox GSM Gateway.
+
 2015-03-31  Randall Degges
 
     * Porting packaging to setuptools (modern).
